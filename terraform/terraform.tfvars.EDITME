@@ -1,0 +1,6 @@
+aws_access_key = "XXXXX"
+aws_secret_key = "XXXXX"
+domain_name = "x.com"
+cloudflare_email   = "name@email.com"
+cloudflare_api_key = "XXXXX"
+cloudflare_zone_id = "XXXXX"
