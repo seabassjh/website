@@ -20,10 +20,17 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci --prefer-offline
+
       - name: Build
         run: npm run build
+
+      - name: Post Setup | Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/
 
   aws:
     needs: build
@@ -36,7 +43,7 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Setup | Place dist
-        run: mv ./artifact/ ./build/
+        run: mv ./artifact/ ./dist/
 
       - name: Configure | AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,4 +74,4 @@ jobs:
 
       - name: Deploy | S3
         run: |
-          aws s3 sync ./build/ s3://sebastian.jhamel.com --delete
+          aws s3 sync ./dist/ s3://sebastian.jhamel.com --delete
