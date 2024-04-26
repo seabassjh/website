@@ -1,0 +1,70 @@
+name: Release Latest
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: 'Build (${{ matrix.os }}, Node ${{ matrix.node }})'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-latest'
+        node:
+          - '16'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+      - name: Build
+        run: npm run build
+
+  aws:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup | Download dist
+        uses: actions/download-artifact@v4
+
+      - name: Setup | Place dist
+        run: mv ./artifact/ ./build/
+
+      - name: Configure | AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-duration-seconds: 3600
+          role-session-name: GitHubActions
+
+      - name: Setup | Terraform
+        uses: hashicorp/setup-terraform@v3
+        env:
+          TF_ACTION_WORKING_DIR: 'terraform'
+
+      - name: Terraform | Apply
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+        env:
+          TF_VAR_cloudflare_api_key: ${{ secrets.CLOUDFLARE_API_KEY }}
+          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_cloudflare_email: ${{ secrets.CLOUDFLARE_EMAIL }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+
+      - name: Deploy | S3
+        run: |
+          aws s3 sync ./build/ s3://sebastian.jhamel.com --delete
